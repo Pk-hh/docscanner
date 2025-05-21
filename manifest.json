@@ -1,11 +1,11 @@
 {
   "name": "Doc Scanner",
-  "short_name": "DocScan",
+  "short_name": "DocScanner",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#0078d7",
-  "theme_color": "#0078d7",
-  "description": "A mobile document scanner with edge detection",
+  "background_color": "#3498db",
+  "theme_color": "#3498db",
+  "description": "A simple document scanner web app PWA",
   "icons": [
     {
       "src": "icons/icon-192.png",
@@ -19,4 +19,3 @@
     }
   ]
 }
-
