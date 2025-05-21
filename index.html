@@ -1,255 +1,167 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>Doc Scanner</title>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
-  
-  <!-- PWA meta tags -->
-  <meta name="theme-color" content="#3498db" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Doc Scanner" />
-
-  <!-- Icons for PWA and iOS -->
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
-  <link rel="manifest" href="manifest.json" />
-  
-  <style>
-    :root {
-      --primary-color: #3498db;
-      --bg-light: #f5f7fa;
-      --bg-dark: #2c3e50;
-      --text-dark: #333;
-      --text-light: #fff;
-      --card-bg: #fff;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg-light: #1e1e1e;
-        --card-bg: #2c2c2c;
-        --text-dark: #fff;
-      }
-    }
-
-    body {
-      font-family: 'Poppins', sans-serif;
-      background: var(--bg-light);
-      color: var(--text-dark);
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-height: 100vh;
-    }
-
-    .app-header {
-      width: 100%;
-      padding: 1rem;
-      background: var(--primary-color);
-      color: white;
-      text-align: center;
-      font-size: 1.5rem;
-      font-weight: 600;
-      user-select: none;
-    }
-
-    .scanner-container {
-      background: var(--card-bg);
-      border-radius: 20px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-      width: 95%;
-      max-width: 500px;
-      margin: 20px auto;
-      padding: 15px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    video, canvas {
-      width: 100%;
-      border-radius: 12px;
-      margin: 10px 0;
-      max-height: 320px;
-      object-fit: cover;
-    }
-
-    .scan-button {
-      width: 90px;
-      height: 90px;
-      border-radius: 50%;
-      border: none;
-      background: var(--primary-color);
-      color: white;
-      font-size: 32px;
-      cursor: pointer;
-      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-      transition: background 0.3s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      user-select: none;
-    }
-
-    .scan-button:active {
-      background: #2980b9;
-    }
-
-    .preview-controls {
-      display: flex;
-      justify-content: space-between;
-      width: 100%;
-      margin-top: 10px;
-    }
-
-    .preview-controls button {
-      flex: 1;
-      margin: 0 5px;
-      padding: 12px 0;
-      border-radius: 12px;
-      border: none;
-      background: #eee;
-      font-size: 16px;
-      cursor: pointer;
-      transition: background 0.3s;
-      user-select: none;
-    }
-
-    .preview-controls button:hover {
-      background: #ddd;
-    }
-
-    .features {
-      margin-top: 30px;
-      width: 95%;
-      max-width: 500px;
-      color: var(--text-dark);
-    }
-
-    .feature-item {
-      background: var(--card-bg);
-      border-radius: 12px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-      padding: 15px;
-      margin-bottom: 12px;
-      font-size: 16px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .feature-icon {
-      font-size: 24px;
-      flex-shrink: 0;
-    }
-
-    @media (max-width: 400px) {
-      .scan-button {
-        width: 75px;
-        height: 75px;
-        font-size: 26px;
-      }
-      .preview-controls button {
-        font-size: 14px;
-        padding: 10px 0;
-      }
-      .feature-item {
-        font-size: 14px;
-      }
-    }
-  </style>
-
-  <script async src="https://docs.opencv.org/4.x/opencv.js" type="text/javascript"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Doc Scanner Web App</title>
+<style>
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0; padding: 0;
+    background: #f5f5f5;
+    color: #222;
+    display: flex; flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+  header {
+    background: #0078d7;
+    color: white;
+    width: 100%;
+    padding: 1rem;
+    font-size: 1.5rem;
+    text-align: center;
+  }
+  #video {
+    border-radius: 12px;
+    max-width: 90vw;
+    max-height: 60vh;
+    margin-top: 1rem;
+    background: black;
+  }
+  #captureBtn {
+    margin: 1rem;
+    background: #0078d7;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    padding: 1rem 2rem;
+    border-radius: 50px;
+    cursor: pointer;
+    box-shadow: 0 4px 8px rgba(0,120,215,0.4);
+    transition: background 0.3s;
+  }
+  #captureBtn:hover {
+    background: #005a9e;
+  }
+  #gallery {
+    margin: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+  }
+  .thumb {
+    width: 120px;
+    height: 160px;
+    object-fit: contain;
+    border: 2px solid #0078d7;
+    border-radius: 8px;
+  }
+  #exportPdf {
+    margin: 1rem;
+    padding: 0.8rem 2rem;
+    font-size: 1.2rem;
+    border: none;
+    background: #28a745;
+    color: white;
+    border-radius: 50px;
+    cursor: pointer;
+    box-shadow: 0 4px 8px rgba(40,167,69,0.4);
+  }
+  #exportPdf:hover {
+    background: #1e7e34;
+  }
+</style>
 </head>
 <body>
-  <div class="app-header">📄 Doc Scanner</div>
-  <div class="scanner-container">
-    <video id="video" autoplay playsinline></video>
-    <button class="scan-button" onclick="capture()" aria-label="Scan Document">📸</button>
-    <canvas id="canvas"></canvas>
-    <div class="preview-controls">
-      <button onclick="rotate()">🔄 Rotate</button>
-      <button onclick="enhance()">✨ Enhance</button>
-      <button onclick="autoCrop()">📐 Auto-Crop</button>
-    </div>
-  </div>
 
-  <div class="features">
-    <div class="feature-item"><div class="feature-icon">📷</div> Quick Scan Button — Large central camera button for fast capture</div>
-    <div class="feature-item"><div class="feature-icon">📐</div> Auto-crop and edge detection preview — Real-time corner detection overlay</div>
-    <div class="feature-item"><div class="feature-icon">🎨</div> Image enhancements — One-tap filters (B/W, grayscale, magic color)</div>
-    <div class="feature-item"><div class="feature-icon">📄</div> Multi-page scanning — Add multiple pages before saving as PDF</div>
-    <div class="feature-item"><div class="feature-icon">📑</div> PDF export options — Export scans as PDFs with compression and page order</div>
-    <div class="feature-item"><div class="feature-icon">🗂️</div> Recent scans dashboard — See thumbnail previews of past scans</div>
-    <div class="feature-item"><div class="feature-icon">🖊️</div> OCR & annotation tools — Extract text and add notes/highlights</div>
-    <div class="feature-item"><div class="feature-icon">☁️</div> Cloud sync/export — Google Drive, Dropbox, Email integration</div>
-    <div class="feature-item"><div class="feature-icon">🌗</div> Dark mode — Auto support via system theme</div>
-    <div class="feature-item"><div class="feature-icon">🔒</div> Document security — PIN/Face ID lock for private files</div>
-  </div>
+<header>📄 Doc Scanner Web App</header>
 
-  <script>
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const context = canvas.getContext('2d');
+<video id="video" autoplay playsinline></video>
+<button id="captureBtn">📸 Capture</button>
 
-    // Start camera
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-      .then(stream => {
-        video.srcObject = stream;
-      })
-      .catch(err => {
-        alert('Camera access denied: ' + err);
+<div id="gallery"></div>
+<button id="exportPdf">📄 Export as PDF</button>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+  const video = document.getElementById('video');
+  const captureBtn = document.getElementById('captureBtn');
+  const gallery = document.getElementById('gallery');
+  const exportPdfBtn = document.getElementById('exportPdf');
+
+  let capturedImages = [];
+
+  // Access camera
+  async function startCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}});
+      video.srcObject = stream;
+    } catch (e) {
+      alert('Could not access camera: ' + e);
+    }
+  }
+  startCamera();
+
+  // Capture image from video
+  captureBtn.onclick = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // Simple auto crop simulation - crop center rectangle (70% width and height)
+    const cropWidth = canvas.width * 0.7;
+    const cropHeight = canvas.height * 0.7;
+    const cropX = (canvas.width - cropWidth) / 2;
+    const cropY = (canvas.height - cropHeight) / 2;
+
+    const croppedCanvas = document.createElement('canvas');
+    croppedCanvas.width = cropWidth;
+    croppedCanvas.height = cropHeight;
+    const croppedCtx = croppedCanvas.getContext('2d');
+    croppedCtx.drawImage(canvas, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+
+    const imgUrl = croppedCanvas.toDataURL('image/jpeg', 0.9);
+    capturedImages.push(imgUrl);
+
+    // Add to gallery
+    const imgElem = document.createElement('img');
+    imgElem.src = imgUrl;
+    imgElem.className = 'thumb';
+    gallery.appendChild(imgElem);
+  };
+
+  // Export all captured images as PDF
+  exportPdfBtn.onclick = () => {
+    if (capturedImages.length === 0) {
+      alert('No pages captured yet!');
+      return;
+    }
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF();
+
+    let promises = capturedImages.map((img, idx) => {
+      return new Promise(resolve => {
+        const image = new Image();
+        image.src = img;
+        image.onload = () => {
+          const imgWidth = 180; // keep PDF width reasonable
+          const imgHeight = (image.height / image.width) * imgWidth;
+          if(idx > 0) pdf.addPage();
+          pdf.addImage(image, 'JPEG', 15, 15, imgWidth, imgHeight);
+          resolve();
+        };
       });
+    });
 
-    // Dummy functions for preview controls
-    function capture() {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    Promise.all(promises).then(() => {
+      pdf.save('scanned-document.pdf');
+    });
+  };
+</script>
 
-      if (typeof cv === 'undefined') {
-        alert("OpenCV is still loading. Please try again in a few seconds.");
-        return;
-      }
-
-      let src = cv.imread(canvas);
-      let gray = new cv.Mat();
-      let edges = new cv.Mat();
-
-      cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-      cv.Canny(gray, edges, 50, 150);
-      cv.imshow(canvas, edges);
-
-      src.delete(); gray.delete(); edges.delete();
-    }
-
-    function rotate() {
-      alert("Rotate functionality coming soon!");
-    }
-    function enhance() {
-      alert("Enhance functionality coming soon!");
-    }
-    function autoCrop() {
-      alert("Auto-crop functionality coming soon!");
-    }
-  </script>
-
-  <script>
-    // Register service worker for offline support
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').then(registration => {
-          console.log('ServiceWorker registered:', registration.scope);
-        }).catch(err => {
-          console.log('ServiceWorker registration failed:', err);
-        });
-      });
-    }
-  </script>
 </body>
 </html>
