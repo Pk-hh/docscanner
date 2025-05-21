@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Doc Scanner Web App</title>
+<title>Doc Scanner with Edge Detection</title>
 <style>
+  /* Same basic styles as before */
   body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     margin: 0; padding: 0;
@@ -22,12 +23,21 @@
     font-size: 1.5rem;
     text-align: center;
   }
-  #video {
+  #video, #canvasOutput {
     border-radius: 12px;
     max-width: 90vw;
     max-height: 60vh;
     margin-top: 1rem;
     background: black;
+    position: relative;
+  }
+  #canvasOutput {
+    position: absolute;
+    top: 0; left: 0;
+    z-index: 10;
+  }
+  #container {
+    position: relative;
   }
   #captureBtn {
     margin: 1rem;
@@ -58,110 +68,247 @@
     border: 2px solid #0078d7;
     border-radius: 8px;
   }
-  #exportPdf {
-    margin: 1rem;
-    padding: 0.8rem 2rem;
-    font-size: 1.2rem;
-    border: none;
-    background: #28a745;
-    color: white;
-    border-radius: 50px;
-    cursor: pointer;
-    box-shadow: 0 4px 8px rgba(40,167,69,0.4);
-  }
-  #exportPdf:hover {
-    background: #1e7e34;
-  }
 </style>
 </head>
 <body>
 
-<header>📄 Doc Scanner Web App</header>
+<header>📄 Doc Scanner with Edge Detection</header>
 
-<video id="video" autoplay playsinline></video>
+<div id="container">
+  <video id="video" autoplay playsinline></video>
+  <canvas id="canvasOutput"></canvas>
+</div>
+
 <button id="captureBtn">📸 Capture</button>
 
 <div id="gallery"></div>
-<button id="exportPdf">📄 Export as PDF</button>
 
+<script async src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady();"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
-  const video = document.getElementById('video');
-  const captureBtn = document.getElementById('captureBtn');
-  const gallery = document.getElementById('gallery');
-  const exportPdfBtn = document.getElementById('exportPdf');
+  let video = document.getElementById('video');
+  let canvasOutput = document.getElementById('canvasOutput');
+  let ctxOutput = canvasOutput.getContext('2d');
+  let captureBtn = document.getElementById('captureBtn');
+  let gallery = document.getElementById('gallery');
+  let streaming = false;
 
   let capturedImages = [];
 
-  // Access camera
+  // OpenCV variables
+  let srcMat, grayMat, edgesMat;
+
+  // OpenCV ready callback
+  function onOpenCvReady() {
+    console.log('OpenCV.js is ready');
+    startCamera();
+  }
+
   async function startCamera() {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}});
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
       video.srcObject = stream;
+      video.play();
+      video.onloadedmetadata = () => {
+        canvasOutput.width = video.videoWidth;
+        canvasOutput.height = video.videoHeight;
+        streaming = true;
+        startProcessing();
+      };
     } catch (e) {
-      alert('Could not access camera: ' + e);
+      alert("Camera error: " + e);
     }
   }
-  startCamera();
 
-  // Capture image from video
+  function startProcessing() {
+    srcMat = new cv.Mat(video.videoHeight, video.videoWidth, cv.CV_8UC4);
+    grayMat = new cv.Mat();
+    edgesMat = new cv.Mat();
+
+    const process = () => {
+      if (!streaming) {
+        // clean up
+        srcMat.delete();
+        grayMat.delete();
+        edgesMat.delete();
+        return;
+      }
+
+      ctxOutput.drawImage(video, 0, 0, canvasOutput.width, canvasOutput.height);
+      let imageData = ctxOutput.getImageData(0, 0, canvasOutput.width, canvasOutput.height);
+      srcMat.data.set(imageData.data);
+
+      // Convert to grayscale
+      cv.cvtColor(srcMat, grayMat, cv.COLOR_RGBA2GRAY);
+      // Blur to reduce noise
+      cv.GaussianBlur(grayMat, grayMat, new cv.Size(5, 5), 0);
+      // Canny edge detection
+      cv.Canny(grayMat, edgesMat, 75, 200);
+
+      // Find contours
+      let contours = new cv.MatVector();
+      let hierarchy = new cv.Mat();
+      cv.findContours(edgesMat, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+
+      // Find the biggest 4-point contour (approximate polygon)
+      let maxArea = 0;
+      let approxCurve = new cv.Mat();
+      let biggest = null;
+      for (let i = 0; i < contours.size(); ++i) {
+        let cnt = contours.get(i);
+        let area = cv.contourArea(cnt);
+        if (area > 10000) {
+          cv.approxPolyDP(cnt, approxCurve, 0.02 * cv.arcLength(cnt, true), true);
+          if (approxCurve.rows === 4 && area > maxArea) {
+            maxArea = area;
+            biggest = approxCurve.clone();
+          }
+        }
+        cnt.delete();
+      }
+
+      // Draw polygon if found
+      ctxOutput.lineWidth = 4;
+      ctxOutput.strokeStyle = 'lime';
+      ctxOutput.clearRect(0, 0, canvasOutput.width, canvasOutput.height);
+      ctxOutput.drawImage(video, 0, 0, canvasOutput.width, canvasOutput.height);
+
+      if (biggest !== null) {
+        // Draw detected document contour
+        ctxOutput.beginPath();
+        for (let i = 0; i < 4; i++) {
+          let point = biggest.data32S.slice(i * 2, i * 2 + 2);
+          if (i === 0) ctxOutput.moveTo(point[0], point[1]);
+          else ctxOutput.lineTo(point[0], point[1]);
+        }
+        ctxOutput.closePath();
+        ctxOutput.stroke();
+      }
+
+      hierarchy.delete();
+      contours.delete();
+      approxCurve.delete();
+      if (biggest) biggest.delete();
+
+      requestAnimationFrame(process);
+    };
+    process();
+  }
+
+  // Helper: Order points for perspective transform
+  function orderPoints(pts) {
+    // pts: array of 4 [x,y]
+    pts.sort((a, b) => a[0] - b[0]);
+    let left = pts.slice(0, 2).sort((a, b) => a[1] - b[1]);
+    let right = pts.slice(2, 4).sort((a, b) => a[1] - b[1]);
+
+    return [left[0], right[0], right[1], left[1]];
+  }
+
+  // Perspective transform and capture
   captureBtn.onclick = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    if (!streaming) return alert("Camera not ready yet");
 
-    // Simple auto crop simulation - crop center rectangle (70% width and height)
-    const cropWidth = canvas.width * 0.7;
-    const cropHeight = canvas.height * 0.7;
-    const cropX = (canvas.width - cropWidth) / 2;
-    const cropY = (canvas.height - cropHeight) / 2;
+    ctxOutput.drawImage(video, 0, 0, canvasOutput.width, canvasOutput.height);
+    let imgData = ctxOutput.getImageData(0, 0, canvasOutput.width, canvasOutput.height);
 
-    const croppedCanvas = document.createElement('canvas');
-    croppedCanvas.width = cropWidth;
-    croppedCanvas.height = cropHeight;
-    const croppedCtx = croppedCanvas.getContext('2d');
-    croppedCtx.drawImage(canvas, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+    // Convert to cv.Mat
+    let src = cv.matFromImageData(imgData);
+    let gray = new cv.Mat();
+    let edges = new cv.Mat();
 
-    const imgUrl = croppedCanvas.toDataURL('image/jpeg', 0.9);
-    capturedImages.push(imgUrl);
+    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+    cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0);
+    cv.Canny(gray, edges, 75, 200);
 
-    // Add to gallery
-    const imgElem = document.createElement('img');
-    imgElem.src = imgUrl;
-    imgElem.className = 'thumb';
-    gallery.appendChild(imgElem);
-  };
+    let contours = new cv.MatVector();
+    let hierarchy = new cv.Mat();
+    cv.findContours(edges, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
 
-  // Export all captured images as PDF
-  exportPdfBtn.onclick = () => {
-    if (capturedImages.length === 0) {
-      alert('No pages captured yet!');
+    let maxArea = 0;
+    let biggest = null;
+    let approxCurve = new cv.Mat();
+
+    for (let i = 0; i < contours.size(); ++i) {
+      let cnt = contours.get(i);
+      let area = cv.contourArea(cnt);
+      if (area > 10000) {
+        cv.approxPolyDP(cnt, approxCurve, 0.02 * cv.arcLength(cnt, true), true);
+        if (approxCurve.rows === 4 && area > maxArea) {
+          maxArea = area;
+          biggest = approxCurve.clone();
+        }
+      }
+      cnt.delete();
+    }
+
+    if (!biggest) {
+      alert("No document detected, capture canceled.");
+      src.delete(); gray.delete(); edges.delete();
+      contours.delete(); hierarchy.delete(); approxCurve.delete();
       return;
     }
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF();
 
-    let promises = capturedImages.map((img, idx) => {
-      return new Promise(resolve => {
-        const image = new Image();
-        image.src = img;
-        image.onload = () => {
-          const imgWidth = 180; // keep PDF width reasonable
-          const imgHeight = (image.height / image.width) * imgWidth;
-          if(idx > 0) pdf.addPage();
-          pdf.addImage(image, 'JPEG', 15, 15, imgWidth, imgHeight);
-          resolve();
-        };
-      });
-    });
+    // Order points
+    let points = [];
+    for (let i = 0; i < 4; i++) {
+      points.push([biggest.data32S[i*2], biggest.data32S[i*2 +1]]);
+    }
+    let ordered = orderPoints(points);
 
-    Promise.all(promises).then(() => {
-      pdf.save('scanned-document.pdf');
-    });
+    // Calculate width and height for output image
+    function dist(a, b) {
+      return Math.hypot(a[0] - b[0], a[1] - b[1]);
+    }
+    let widthA = dist(ordered[2], ordered[3]);
+    let widthB = dist(ordered[1], ordered[0]);
+    let maxWidth = Math.max(widthA, widthB);
+
+    let heightA = dist(ordered[1], ordered[2]);
+    let heightB = dist(ordered[0], ordered[3]);
+    let maxHeight = Math.max(heightA, heightB);
+
+    // Destination points
+    let dstCoords = cv.matFromArray(4, 1, cv.CV_32FC2, [
+      0, 0,
+      maxWidth -1, 0,
+      maxWidth -1, maxHeight -1,
+      0, maxHeight -1
+    ]);
+
+    let srcCoords = cv.matFromArray(4, 1, cv.CV_32FC2, [
+      ordered[0][0], ordered[0][1],
+      ordered[1][0], ordered[1][1],
+      ordered[2][0], ordered[2][1],
+      ordered[3][0], ordered[3][1]
+    ]);
+
+    let M = cv.getPerspectiveTransform(srcCoords, dstCoords);
+    let warped = new cv.Mat();
+    cv.warpPerspective(src, warped, M, new cv.Size(maxWidth, maxHeight));
+
+    // Convert warped mat to canvas image
+    let outputCanvas = document.createElement('canvas');
+    outputCanvas.width = warped.cols;
+    outputCanvas.height = warped.rows;
+    let outputCtx = outputCanvas.getContext('2d');
+    let imgDataOut = new ImageData(new Uint8ClampedArray(warped.data), warped.cols, warped.rows);
+    outputCtx.putImageData(imgDataOut, 0, 0);
+
+    // Create image element
+    let img = new Image();
+    img.src = outputCanvas.toDataURL('image/png');
+    img.className = 'thumb';
+    gallery.appendChild(img);
+    capturedImages.push(img.src);
+
+    // Cleanup
+    src.delete(); gray.delete(); edges.delete();
+    contours.delete(); hierarchy.delete();
+    approxCurve.delete();
+    biggest.delete();
+    srcCoords.delete(); dstCoords.delete(); M.delete(); warped.delete();
   };
 </script>
-
 </body>
 </html>
