@@ -1,74 +1,105 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" >
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Doc Scanner</title>
-
-  <!-- PWA Manifest & Meta -->
-  <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#0078d7" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <link rel="apple-touch-icon" href="icons/icon-192.png" />
-
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Doc Scanner PWA</title>
+  
+  <!-- Poppins font -->
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
+
+  <!-- Tesseract.js for OCR -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+
+  <!-- SortableJS for drag-drop reorder -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
   <style>
     :root {
       --primary-color: #3498db;
       --bg-light: #f5f7fa;
-      --bg-dark: #2c3e50;
+      --bg-dark: #121212;
       --text-dark: #333;
       --text-light: #fff;
       --card-bg: #fff;
+      --card-bg-dark: #1e1e1e;
     }
 
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg-light: #1e1e1e;
-        --card-bg: #2c2c2c;
-        --text-dark: #fff;
+        --bg-light: var(--bg-dark);
+        --card-bg: var(--card-bg-dark);
+        --text-dark: var(--text-light);
       }
     }
 
     body {
+      margin: 0; padding: 0;
       font-family: 'Poppins', sans-serif;
       background: var(--bg-light);
       color: var(--text-dark);
-      margin: 0;
-      padding: 0;
       display: flex;
       flex-direction: column;
-      align-items: center;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    body.dark-mode {
+      background: var(--bg-dark);
+      color: var(--text-light);
     }
 
     .app-header {
-      width: 100%;
-      padding: 1rem;
       background: var(--primary-color);
       color: white;
-      text-align: center;
+      font-weight: 600;
       font-size: 1.5rem;
+      text-align: center;
+      padding: 1rem;
+      user-select: none;
+    }
+
+    main {
+      flex: 1;
+      padding: 10px;
+      max-width: 480px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* Camera & Canvas */
+    #video {
+      width: 100%;
+      border-radius: 12px;
+      background: black;
+    }
+
+    #canvas {
+      display: none;
+      width: 100%;
+      border-radius: 12px;
+      margin-top: 10px;
+    }
+
+    /* Crop adjustment overlay */
+    #cropOverlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: auto;
+      border-radius: 12px;
+      touch-action: none;
+      user-select: none;
     }
 
     .scanner-container {
-      background: var(--card-bg);
-      border-radius: 20px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-      width: 95%;
-      max-width: 500px;
-      margin: 20px auto;
-      padding: 20px;
+      position: relative;
+      margin-bottom: 20px;
     }
 
-    video,
-    canvas {
-      width: 100%;
-      border-radius: 12px;
-      margin: 10px 0;
-    }
-
+    /* Central Scan Button */
     .scan-button {
       width: 80px;
       height: 80px;
@@ -76,25 +107,27 @@
       border: none;
       background: var(--primary-color);
       color: white;
-      font-size: 24px;
+      font-size: 36px;
+      display: block;
+      margin: 15px auto;
       cursor: pointer;
-      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
       transition: background 0.3s;
     }
-
     .scan-button:hover {
       background: #2980b9;
     }
 
+    /* Controls below preview */
     .preview-controls {
       display: flex;
       justify-content: space-between;
-      margin-top: 10px;
+      margin: 10px 0;
+      gap: 8px;
     }
 
     .preview-controls button {
       flex: 1;
-      margin: 0 5px;
       padding: 10px;
       border-radius: 10px;
       border: none;
@@ -103,100 +136,437 @@
       cursor: pointer;
       transition: background 0.3s;
     }
-
     .preview-controls button:hover {
       background: #ddd;
     }
+
+    body.dark-mode .preview-controls button {
+      background: #333;
+      color: white;
+    }
+    body.dark-mode .preview-controls button:hover {
+      background: #555;
+    }
+
+    /* Pages thumbnails container */
+    #pagesContainer {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding: 10px 0;
+      border-top: 1px solid #ccc;
+      border-bottom: 1px solid #ccc;
+      user-select: none;
+    }
+    #pagesContainer img {
+      width: 60px;
+      height: 80px;
+      object-fit: cover;
+      border-radius: 8px;
+      cursor: grab;
+      border: 2px solid transparent;
+      transition: border 0.3s;
+    }
+    #pagesContainer img.selected {
+      border-color: var(--primary-color);
+    }
+
+    /* Feature & status messages */
+    #statusMessage {
+      text-align: center;
+      margin-top: 10px;
+      font-style: italic;
+      min-height: 1.5rem;
+    }
+
+    /* OCR Text Output */
+    #ocrTextOutput {
+      white-space: pre-wrap;
+      background: #f7f7f7;
+      border-radius: 10px;
+      padding: 10px;
+      max-height: 150px;
+      overflow-y: auto;
+      font-size: 0.9rem;
+      margin-top: 10px;
+      border: 1px solid #ccc;
+    }
+    body.dark-mode #ocrTextOutput {
+      background: #222;
+      border-color: #444;
+      color: white;
+    }
+
+    /* Toggle Dark mode button */
+    #darkModeToggle {
+      position: fixed;
+      bottom: 15px;
+      right: 15px;
+      background: var(--primary-color);
+      border: none;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      transition: background 0.3s;
+      z-index: 999;
+    }
+    #darkModeToggle:hover {
+      background: #2980b9;
+    }
   </style>
-  <script async src="https://docs.opencv.org/4.x/opencv.js" type="text/javascript"></script>
 </head>
 <body>
-  <div class="app-header">📄 Doc Scanner</div>
+  <div class="app-header">📄 Doc Scanner PWA</div>
 
-  <div class="scanner-container">
-    <video id="video" autoplay playsinline></video>
-    <br />
-    <button class="scan-button" onclick="capture()">📸</button>
-    <canvas id="canvas"></canvas>
-    <div class="preview-controls">
-      <button onclick="rotateCanvas()">🔄 Rotate</button>
-      <button onclick="enhanceImage()">✨ Enhance</button>
-      <button onclick="autoCrop()">📐 Auto-Crop</button>
+  <main>
+    <div class="scanner-container">
+      <video id="video" autoplay playsinline></video>
+      <canvas id="canvas"></canvas>
+      <canvas id="cropOverlay"></canvas>
+      <button class="scan-button" title="Scan Page (voice: 'capture')" aria-label="Scan Page">📸</button>
+
+      <div class="preview-controls">
+        <button id="btnRotate" title="Rotate Image 90°">🔄 Rotate</button>
+        <button id="btnEnhance" title="Auto Enhance Brightness/Contrast">✨ Enhance</button>
+        <button id="btnCrop" title="Toggle Manual Crop Adjustment">📐 Crop</button>
+        <button id="btnExtractText" title="Extract Text (OCR)">📝 OCR</button>
+      </div>
+
+      <div id="ocrTextOutput" aria-live="polite" aria-atomic="true"></div>
     </div>
-  </div>
+
+    <h3>📑 Scanned Pages (Drag to reorder)</h3>
+    <div id="pagesContainer" aria-label="Scanned pages thumbnails"></div>
+
+    <button id="btnExportPDF" style="width: 100%; padding: 15px; font-size: 16px; background: var(--primary-color); color: white; border:none; border-radius: 10px; cursor:pointer;" aria-label="Export all pages to PDF">Export to PDF 📄</button>
+
+    <div id="statusMessage" aria-live="polite"></div>
+  </main>
+
+  <button id="darkModeToggle" aria-label="Toggle dark mode">🌓</button>
+
+  <!-- jsPDF for PDF creation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <script>
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const context = canvas.getContext('2d');
+    // Globals
+    let video = document.getElementById('video');
+    let canvas = document.getElementById('canvas');
+    let ctx = canvas.getContext('2d');
+    let cropCanvas = document.getElementById('cropOverlay');
+    let cropCtx = cropCanvas.getContext('2d');
+    let scanButton = document.querySelector('.scan-button');
+    let btnRotate = document.getElementById('btnRotate');
+    let btnEnhance = document.getElementById('btnEnhance');
+    let btnCrop = document.getElementById('btnCrop');
+    let btnExtractText = document.getElementById('btnExtractText');
+    let btnExportPDF = document.getElementById('btnExportPDF');
+    let pagesContainer = document.getElementById('pagesContainer');
+    let ocrTextOutput = document.getElementById('ocrTextOutput');
+    let statusMessage = document.getElementById('statusMessage');
+    let darkModeToggle = document.getElementById('darkModeToggle');
 
-    navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: 'environment' } })
-      .then((stream) => {
+    // State
+    let capturedPages = []; // { img: ImageDataURL, rotation: int, brightness: float, contrast: float, cropPolygon: [points] }
+    let currentEditingIndex = null;
+    let manualCropMode = false;
+    let cropPolygon = null; // 4 points {x,y} relative to canvas size for cropping
+    let dragPointIndex = -1;
+
+    // Setup video stream
+    async function setupCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
         video.srcObject = stream;
-      })
-      .catch((err) => {
-        alert('Camera access denied: ' + err);
-      });
+        await video.play();
+      } catch (e) {
+        alert('Camera access is required to scan documents: ' + e.message);
+      }
+    }
 
-    function capture() {
+    // On load
+    window.onload = () => {
+      setupCamera();
+      setupSortable();
+      loadFromStorage();
+      initDarkMode();
+      setupVoiceCommands();
+    };
+
+    // Capture current video frame as image
+    scanButton.onclick = () => capturePage();
+
+    // Capture function
+    function capturePage() {
+      if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+        alert("Video not ready");
+        return;
+      }
+
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      alert('Captured image! You can add enhancements or crop.');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Auto crop (simple center crop fallback)
+      cropPolygon = [
+        { x: 0, y: 0 },
+        { x: canvas.width, y: 0 },
+        { x: canvas.width, y: canvas.height },
+        { x: 0, y: canvas.height }
+      ];
+
+      // Save capture
+      let imgData = canvas.toDataURL("image/jpeg", 0.9);
+      capturedPages.push({ img: imgData, rotation: 0, brightness: 0, contrast: 0, cropPolygon: cropPolygon });
+      currentEditingIndex = capturedPages.length - 1;
+      refreshPages();
+      statusMessage.textContent = "Page captured!";
+      ocrTextOutput.textContent = "";
     }
 
-    function rotateCanvas() {
-      // Simple 90 degrees rotation of canvas image
-      let tempCanvas = document.createElement('canvas');
-      let tempCtx = tempCanvas.getContext('2d');
-
-      tempCanvas.width = canvas.height;
-      tempCanvas.height = canvas.width;
-
-      tempCtx.translate(tempCanvas.width / 2, tempCanvas.height / 2);
-      tempCtx.rotate((90 * Math.PI) / 180);
-      tempCtx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
-
-      canvas.width = tempCanvas.width;
-      canvas.height = tempCanvas.height;
-      context.clearRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(tempCanvas, 0, 0);
+    // Refresh thumbnails
+    function refreshPages() {
+      pagesContainer.innerHTML = '';
+      capturedPages.forEach((page, i) => {
+        let imgEl = document.createElement('img');
+        imgEl.src = page.img;
+        imgEl.alt = `Page ${i + 1}`;
+        imgEl.draggable = false;
+        imgEl.onclick = () => {
+          currentEditingIndex = i;
+          showPageEdit(i);
+          highlightSelectedThumbnail(i);
+        };
+        pagesContainer.appendChild(imgEl);
+      });
+      highlightSelectedThumbnail(currentEditingIndex);
     }
 
-    function enhanceImage() {
-      // Basic enhancement - convert to grayscale
-      let imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-      let data = imageData.data;
-      for (let i = 0; i < data.length; i += 4) {
-        let avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-        data[i] = avg;
-        data[i + 1] = avg;
-        data[i + 2] = avg;
+    function highlightSelectedThumbnail(index) {
+      [...pagesContainer.children].forEach((el, i) => {
+        if (i === index) el.classList.add('selected');
+        else el.classList.remove('selected');
+      });
+    }
+
+    // Show page editing (rotate, enhance, crop overlay)
+    function showPageEdit(index) {
+      if (index === null || !capturedPages[index]) return;
+
+      let page = capturedPages[index];
+      let img = new Image();
+      img.onload = () => {
+        // Resize canvas
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Apply rotation + brightness/contrast (basic for demo)
+        ctx.save();
+        ctx.translate(canvas.width/2, canvas.height/2);
+        ctx.rotate(page.rotation * Math.PI / 180);
+        ctx.translate(-canvas.width/2, -canvas.height/2);
+        ctx.filter = `brightness(${1 + page.brightness}) contrast(${1 + page.contrast})`;
+        ctx.drawImage(img, 0, 0);
+        ctx.restore();
+
+        // Save back updated img (non destructive here)
+        // But we'll update on enhancements and rotate buttons
+
+        if (manualCropMode) {
+          cropCanvas.style.display = 'block';
+          setupCropOverlay(page.cropPolygon);
+        } else {
+          cropCanvas.style.display = 'none';
+        }
+      };
+      img.src = page.img;
+    }
+
+    // Rotate current page 90deg clockwise
+    btnRotate.onclick = () => {
+      if (currentEditingIndex === null) return;
+      capturedPages[currentEditingIndex].rotation = (capturedPages[currentEditingIndex].rotation + 90) % 360;
+      showPageEdit(currentEditingIndex);
+      statusMessage.textContent = "Page rotated 90°";
+    };
+
+    // Enhance brightness/contrast (simple fixed values for demo)
+    btnEnhance.onclick = () => {
+      if (currentEditingIndex === null) return;
+      let page = capturedPages[currentEditingIndex];
+      // Toggle brightness + contrast between 0 and 0.2 for demo
+      page.brightness = page.brightness === 0 ? 0.2 : 0;
+      page.contrast = page.contrast === 0 ? 0.2 : 0;
+      showPageEdit(currentEditingIndex);
+      statusMessage.textContent = "Brightness & Contrast toggled";
+    };
+
+    // Toggle manual crop mode
+    btnCrop.onclick = () => {
+      if (currentEditingIndex === null) return;
+      manualCropMode = !manualCropMode;
+      if (manualCropMode) {
+        statusMessage.textContent = "Drag corners to adjust crop";
+       
+      for (let i = 1; i < polygon.length; i++) {
+        cropCtx.lineTo(polygon[i].x, polygon[i].y);
       }
-      context.putImageData(imageData, 0, 0);
-      alert('Applied grayscale enhancement');
+      cropCtx.closePath();
+      cropCtx.fill();
+      cropCtx.stroke();
+
+      // Draw draggable points
+      polygon.forEach((pt, i) => {
+        cropCtx.beginPath();
+        cropCtx.arc(pt.x, pt.y, 10, 0, 2 * Math.PI);
+        cropCtx.fillStyle = 'lime';
+        cropCtx.fill();
+        cropCtx.strokeStyle = 'darkgreen';
+        cropCtx.stroke();
+      });
     }
 
-    function autoCrop() {
-      alert('Auto crop feature coming soon!');
-      // Will add real edge detection and cropping using OpenCV later
+    // Handle dragging corners on crop overlay
+    cropCanvas.onpointerdown = (e) => {
+      if (!manualCropMode || currentEditingIndex === null) return;
+      const rect = cropCanvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      dragPointIndex = -1;
+      const pts = capturedPages[currentEditingIndex].cropPolygon;
+
+      for (let i = 0; i < pts.length; i++) {
+        let pt = pts[i];
+        if (Math.hypot(pt.x - x, pt.y - y) < 20) {
+          dragPointIndex = i;
+          break;
+        }
+      }
+      if (dragPointIndex !== -1) {
+        cropCanvas.setPointerCapture(e.pointerId);
+      }
+    };
+
+    cropCanvas.onpointermove = (e) => {
+      if (!manualCropMode || currentEditingIndex === null) return;
+      if (dragPointIndex === -1) return;
+      const rect = cropCanvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const pts = capturedPages[currentEditingIndex].cropPolygon;
+      // Clamp inside canvas
+      pts[dragPointIndex].x = Math.min(Math.max(0, x), cropCanvas.width);
+      pts[dragPointIndex].y = Math.min(Math.max(0, y), cropCanvas.height);
+
+      setupCropOverlay(pts);
+    };
+
+    cropCanvas.onpointerup = (e) => {
+      if (!manualCropMode) return;
+      dragPointIndex = -1;
+      saveCropPolygon();
+    };
+
+    // Save crop polygon changes
+    function saveCropPolygon() {
+      if (currentEditingIndex === null) return;
+      // Just keep polygon as is, applied in editing preview (for demo, not real crop)
+      // Real crop would require applying mask on image or canvas processing (complex)
+      statusMessage.textContent = "Crop polygon saved (visual only)";
+      saveToStorage();
     }
+
+    // Save capturedPages to localStorage for persistence
+    function saveToStorage() {
+      localStorage.setItem('docScannerPages', JSON.stringify(capturedPages));
+    }
+
+    // Load from storage
+    function loadFromStorage() {
+      const stored = localStorage.getItem('docScannerPages');
+      if (stored) {
+        try {
+          capturedPages = JSON.parse(stored);
+          if (capturedPages.length) currentEditingIndex = 0;
+          refreshPages();
+          showPageEdit(currentEditingIndex);
+          statusMessage.textContent = "Loaded saved pages";
+        } catch {
+          capturedPages = [];
+        }
+      }
+    }
+
+    // Dark mode toggle
+    function initDarkMode() {
+      const savedMode = localStorage.getItem('darkMode');
+      if (savedMode === 'enabled') {
+        document.body.classList.add('dark-mode');
+      } else if (savedMode === 'disabled') {
+        document.body.classList.remove('dark-mode');
+      } else {
+        // Use system preference
+        if(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          document.body.classList.add('dark-mode');
+        }
+      }
+    }
+
+    darkModeToggle.onclick = () => {
+      document.body.classList.toggle('dark-mode');
+      if(document.body.classList.contains('dark-mode')) {
+        localStorage.setItem('darkMode', 'enabled');
+      } else {
+        localStorage.setItem('darkMode', 'disabled');
+      }
+    };
+
+    // Simple voice commands using Web Speech API
+    function setupVoiceCommands() {
+      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        console.log('Voice commands not supported');
+        return;
+      }
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.continuous = true;
+      recognition.interimResults = false;
+
+      recognition.onresult = (event) => {
+        const last = event.results.length - 1;
+        const command = event.results[last][0].transcript.trim().toLowerCase();
+        console.log('Voice command:', command);
+        if (command.includes('capture') || command.includes('scan')) {
+          scanButton.click();
+        } else if (command.includes('export') || command.includes('pdf')) {
+          btnExportPDF.click();
+        }
+      };
+
+      recognition.onerror = (e) => console.error('Voice recognition error', e);
+      recognition.onend = () => recognition.start();
+
+      recognition.start();
+    }
+
+    // Autosave on page unload
+    window.onbeforeunload = () => {
+      saveToStorage();
+    };
   </script>
 
-  <!-- Register service worker -->
+  <!-- Service Worker for PWA -->
   <script>
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker
-          .register('/sw.js')
-          .then((reg) => {
-            console.log('Service Worker registered.', reg);
-          })
-          .catch((err) => {
-            console.error('Service Worker registration failed:', err);
-          });
-      });
+      navigator.serviceWorker.register('sw.js').then(() => {
+        console.log('Service Worker registered');
+      }).catch(console.error);
     }
   </script>
 </body>
