@@ -3,8 +3,9 @@
   "short_name": "DocScan",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#f5f7fa",
-  "theme_color": "#3498db",
+  "background_color": "#0078d7",
+  "theme_color": "#0078d7",
+  "description": "A mobile document scanner with edge detection",
   "icons": [
     {
       "src": "icons/icon-192.png",
@@ -18,3 +19,4 @@
     }
   ]
 }
+
